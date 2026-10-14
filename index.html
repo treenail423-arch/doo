@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>두더지 잡기 웹앱</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 50px;
+        }
+        #game-container {
+            background-color: #4CAF50;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            width: 460px;
+        }
+        #header {
+            display: flex;
+            justify-content: space-between;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding: 0 10px;
+        }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0px; /* 틈새 제거하여 풀밭 느낌 */
+        }
+        .hole {
+            width: 140px;
+            height: 95px;
+            background-color: #4CAF50;
+            border: none;
+            cursor: pointer;
+            outline: none;
+            background-size: cover;
+            background-position: center;
+        }
+        #start-btn {
+            margin-top: 20px;
+            padding: 10px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: #FF9800;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #start-btn:disabled {
+            background-color: #ccc;
+        }
+        #ranking-board {
+            display: none;
+            background: white;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 10px;
+            width: 460px;
+            box-sizing: border-box;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        h2 { text-align: center; margin-top: 0; }
+        .rank-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="header">
+            <span id="score-text">점수: 0</span>
+            <span id="time-text">남은 시간: 30초</span>
+        </div>
+        <div id="grid">
+            <button class="hole" onclick="hitMole(0)"></button>
+            <button class="hole" onclick="hitMole(1)"></button>
+            <button class="hole" onclick="hitMole(2)"></button>
+            <button class="hole" onclick="hitMole(3)"></button>
+            <button class="hole" onclick="hitMole(4)"></button>
+            <button class="hole" onclick="hitMole(5)"></button>
+            <button class="hole" onclick="hitMole(6)"></button>
+            <button class="hole" onclick="hitMole(7)"></button>
+            <button class="hole" onclick="hitMole(8)"></button>
+        </div>
+    </div>
+
+    <button id="start-btn" onclick="startGame()">게임 시작</button>
+
+    <div id="ranking-board">
+        <h2>🏆 명예의 전당 🏆</h2>
+        <div id="ranking-list">로딩 중...</div>
+    </div>
+
+    <script>
+        // 알려주신 구글 스프레드시트 배포 URL 적용 완료
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzutlefYXeeW_C0Xo8GpkI-p0IXVLxYQMvTBL5iD2KD0FdD1KQaV4S6YlW7hEeXUsDZCA/exec";
+
+        let score = 0;
+        let timeLeft = 30;
+        let isPlaying = false;
+        let holesState = Array(9).fill("down");
+        let activeTimers = [];
+
+        // 이미지 경로 (확장자 주의)
+        const IMG_DOWN = "url('Code_Generated_Image (2).png')";
+        const IMG_UP = "url('Code_Generated_Image (1).png')";
+        const IMG_HIT = "url('Code_Generated_Image.png')";
+
+        const holes = document.querySelectorAll('.hole');
+
+        function initHoles() {
+            holes.forEach(hole => {
+                hole.style.backgroundImage = IMG_DOWN;
+            });
+            holesState.fill("down");
+        }
+        initHoles();
+
+        function hitMole(idx) {
+            if (!isPlaying) return;
+
+            if (holesState[idx] === "up") {
+                holesState[idx] = "hit";
+                holes[idx].style.backgroundImage = IMG_HIT;
+
+                score += 1;
+                document.getElementById('score-text').innerText = "점수: " + score;
+
+                let t = setTimeout(() => {
+                    holesState[idx] = "down";
+                    holes[idx].style.backgroundImage = IMG_DOWN;
+                }, 400);
+                activeTimers.push(t);
+            }
+        }
+
+        function hideMole(idx) {
+            if (isPlaying && holesState[idx] === "up") {
+                holesState[idx] = "down";
+                holes[idx].style.backgroundImage = IMG_DOWN;
+            }
+        }
+
+        function popMole(idx) {
+            if (!isPlaying) return;
+            if (holesState[idx] === "down") {
+                holesState[idx] = "up";
+                holes[idx].style.backgroundImage = IMG_UP;
+
+                let stayTime = Math.floor(Math.random() * 700) + 800;
+                let t = setTimeout(() => hideMole(idx), stayTime);
+                activeTimers.push(t);
+            }
+        }
+
+        function scheduleWave() {
+            if (!isPlaying) return;
+
+            let available = [];
+            for (let i = 0; i < 9; i++) {
+                if (holesState[i] === "down") available.push(i);
+            }
+
+            let numMoles = Math.random() < 0.5 ? 2 : 3;
+            available.sort(() => 0.5 - Math.random());
+            let chosen = available.slice(0, numMoles);
+
+            let delay = 0;
+            chosen.forEach(idx => {
+                let t = setTimeout(() => popMole(idx), delay);
+                activeTimers.push(t);
+                delay += Math.floor(Math.random() * 250) + 100;
+            });
+
+            let nextWave = Math.floor(Math.random() * 1000) + 1000;
+            let t2 = setTimeout(scheduleWave, nextWave);
+            activeTimers.push(t2);
+        }
+
+        function updateTimer() {
+            if (timeLeft > 0 && isPlaying) {
+                timeLeft--;
+                document.getElementById('time-text').innerText = "남은 시간: " + timeLeft + "초";
+                let t = setTimeout(updateTimer, 1000);
+                activeTimers.push(t);
+            } else if (timeLeft <= 0) {
+                endGame();
+            }
+        }
+
+        function startGame() {
+            activeTimers.forEach(clearTimeout);
+            activeTimers = [];
+            score = 0;
+            timeLeft = 30;
+            isPlaying = true;
+
+            document.getElementById('score-text').innerText = "점수: " + score;
+            document.getElementById('time-text').innerText = "남은 시간: " + timeLeft + "초";
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('ranking-board').style.display = "none";
+
+            initHoles();
+            scheduleWave();
+            updateTimer();
+        }
+
+        function endGame() {
+            isPlaying = false;
+            document.getElementById('start-btn').disabled = false;
+            initHoles();
+
+            setTimeout(() => {
+                let playerName = prompt(`게임 종료! 최종 점수는 ${score}점입니다.\n랭킹에 등록할 이름을 입력해주세요:`);
+                if(playerName) {
+                    submitScore(playerName, score);
+                }
+            }, 100);
+        }
+
+        function submitScore(name, score) {
+            document.getElementById('ranking-board').style.display = "block";
+            document.getElementById('ranking-list').innerHTML = "서버에 점수를 저장하고 랭킹을 불러오는 중입니다...";
+
+            // GET 방식으로 데이터 전송 (CORS 이슈 우회)
+            fetch(`${SCRIPT_URL}?name=${encodeURIComponent(name)}&score=${score}`)
+                .then(response => response.json())
+                .then(data => {
+                    let html = "";
+                    data.forEach((rank, index) => {
+                        html += `<div class="rank-item">
+                                    <span><strong>${index + 1}위</strong> ${rank.name}</span>
+                                    <span>${rank.score}점</span>
+                                 </div>`;
+                    });
+                    document.getElementById('ranking-list').innerHTML = html;
+                })
+                .catch(error => {
+                    console.error("에러 발생:", error);
+                    document.getElementById('ranking-list').innerHTML = "랭킹을 불러오는데 실패했습니다.";
+                });
+        }
+    </script>
+</body>
+</html>
